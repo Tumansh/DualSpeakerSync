@@ -1,0 +1,45 @@
+# ============================================================
+# C++ / Visual Studio / MSVC
+# ============================================================
+
+# Build outputs
+audioEngine/*.exe
+audioEngine/*.obj
+audioEngine/*.pdb
+audioEngine/*.ilk
+audioEngine/*.lib
+audioEngine/*.exp
+audioEngine/*.dll
+
+# Build directory
+audioEngine/build/
+audioEngine/bin/
+audioEngine/obj/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ============================================================
+# React / Node
+# ============================================================
+
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Environment files
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+
+# ============================================================
+# General
+# ============================================================
+
+*.log
+.DS_Store
+Thumbs.db
