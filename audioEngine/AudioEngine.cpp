@@ -27,9 +27,6 @@
 static const int DEFAULT_COBRA_INDEX = 0;
 static const int DEFAULT_MIVI_INDEX = 1;
 
-// Realtek is currently used as the WASAPI loopback source.
-static const int CAPTURE_DEVICE_INDEX = 3;
-
 static const double COBRA_DELAY_SECONDS = 0.0;
 static const double MIVI_DELAY_SECONDS = 0.0;
 
@@ -182,7 +179,6 @@ static std::vector<IMMDevice*> enumerateDevices()
     {
         std::cerr
             << "Failed to create MMDeviceEnumerator\n";
-
         return devices;
     }
 
@@ -197,26 +193,59 @@ static std::vector<IMMDevice*> enumerateDevices()
     if (FAILED(hr))
     {
         enumerator->Release();
-
         return devices;
     }
 
     UINT count = 0;
-
     collection->GetCount(&count);
+
+    // Only expose the two speakers used by this project.
+    // All other Windows audio output devices are ignored.
+    IMMDevice* cobraDevice = nullptr;
+    IMMDevice* miviDevice = nullptr;
 
     for (UINT i = 0; i < count; ++i)
     {
         IMMDevice* device = nullptr;
 
-        if (SUCCEEDED(collection->Item(i, &device)))
+        if (FAILED(collection->Item(i, &device)))
+            continue;
+
+        std::string name = getDeviceName(device);
+
+        if (name.find("COBRA") != std::string::npos ||
+            name.find("Cobra") != std::string::npos)
         {
-            devices.push_back(device);
+            if (cobraDevice == nullptr)
+            {
+                cobraDevice = device;
+                continue;
+            }
         }
+
+        if (name.find("Mivi") != std::string::npos ||
+            name.find("MIVI") != std::string::npos)
+        {
+            if (miviDevice == nullptr)
+            {
+                miviDevice = device;
+                continue;
+            }
+        }
+
+        device->Release();
     }
 
-    collection->Release();
+    // Stable order for the React UI and engine:
+    // [0] Cobra
+    // [1] Mivi
+    if (cobraDevice != nullptr)
+        devices.push_back(cobraDevice);
 
+    if (miviDevice != nullptr)
+        devices.push_back(miviDevice);
+
+    collection->Release();
     enumerator->Release();
 
     return devices;
@@ -939,41 +968,33 @@ public:
         }
 
         // ----------------------------------------------------
-        // CURRENT CAPTURE DEVICE
+        // CAPTURE DEVICE
         // ----------------------------------------------------
         //
-        // [3] Speakers (Realtek(R) Audio)
-        //
-        // This is deliberately NOT the Bluetooth output.
-        //
+        // Loopback capture uses the Windows default render endpoint.
+        // This is separate from the two output speakers exposed by
+        // this engine. Other output devices are not selectable.
 
-        if (CAPTURE_DEVICE_INDEX >=
-            static_cast<int>(
-                devices.size()
-            ))
+        hr = enumerator->GetDefaultAudioEndpoint(
+            eRender,
+            eConsole,
+            &captureDevice
+        );
+
+        if (FAILED(hr) || captureDevice == nullptr)
         {
             std::cerr
-                << "Invalid capture device index.\n";
+                << "Failed to get Windows default audio output for loopback capture.\n";
 
             enumerator->Release();
-
             return false;
         }
-
-        captureDevice =
-            devices[
-                CAPTURE_DEVICE_INDEX
-            ];
-
-        captureDevice->AddRef();
 
         enumerator->Release();
 
         std::cout
             << "\nCapture source: "
-            << getDeviceName(
-                captureDevice
-            )
+            << getDeviceName(captureDevice)
             << "\n";
 
         // ----------------------------------------------------
